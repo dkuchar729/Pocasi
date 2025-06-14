@@ -1,10 +1,12 @@
 package org.example;
 
+import java.io.File;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 
+import javax.print.Doc;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -20,7 +22,7 @@ public class Weather {
     private Pattern tempPattern;
     private Matcher matcher;
     DateTimeFormatter datePattern = DateTimeFormatter.ofPattern("dd.MM.yyyy");
-
+    private CsvManager cm;
     private double maxTemp = 0;
     private double minTemp = 0;
     private double precipitation = 0;
@@ -32,6 +34,7 @@ public class Weather {
 
     public Weather() {
         try {
+            cm = new CsvManager(new File("pocasii.csv"), ';');
             //doc = Jsoup.connect("https://www.in-pocasi.cz/archiv/archiv.php?historie=2024-01-26&region=1").get();
             //tbodies = doc.getElementsByTag("tbody");
             missingValueIndexes = new int[3];
@@ -46,20 +49,32 @@ public class Weather {
     }
 
     public void getWeather(LocalDate startDate, LocalDate endDate, Region region) throws Exception {
-
+        cm.loadCsvData();
         for (LocalDate start = startDate; start.isBefore(endDate); start = start.plusDays(1)) {
             Thread.sleep(2000);
             System.out.println("dalsi");
             String link = prepareLink(start, region.getWeatherRegionNumber());
-            
-            Document doc = Jsoup.connect(link).get();
-            
-            for (Element tBody : doc.getElementsByTag("tbody")) {
 
-                loadData(tBody.children(), region);
+           // Document doc = Jsoup.connect(link).get();
+            //Document doc = Jsoup.connect("http://C:/Users/dorgu/Documents/Test").get();
+            Document doc=Jsoup.parse(new File("C:/Users/dorgu/Documents/Test.html"), null);
+            //System.out.println(doc.getElementsByTag("tbody"));
+            int a=0;
+            for (Element tBody : doc.getElementsByTag("tbody")) {
+                try{
+                    loadData(tBody.children(), start, region);
+                    a++;
+                    System.out.println(tBody.child(0).child(0).child(0).child(0));
+                    System.out.println("index: "+a);
+                    System.out.println("pocet: " +tBody.child(0).child(0).child(0).childNodeSize()+"\n");
+
+                } catch (IndexOutOfBoundsException e) {
+                   System.out.println(e);
+                }
 
             }
-            double maxTempMean = round(mean(maxTemp, rowNumber - missingValueIndexes[0]), 1);
+            
+           /* double maxTempMean = round(mean(maxTemp, rowNumber - missingValueIndexes[0]), 1);
             double minTempMean = round(mean(minTemp, rowNumber - missingValueIndexes[1]), 1);
             double precMean = round(mean(precipitation, rowNumber - missingValueIndexes[2]), 1);
 
@@ -72,8 +87,9 @@ public class Weather {
             precList = new LinkedList<>();
             missingValueIndexes = new int[3];
             rowNumber = 0;
-
+*/
         }
+       // cm.writeData();
 
     }
 
@@ -87,11 +103,14 @@ public class Weather {
         return round(sum / tempList.size(), 1);
     }
 
-    private void loadData(Elements rows, Region region) throws Exception {
+    private void loadData(Elements rows, LocalDate date, Region region) throws Exception {
+        //System.out.println(rows.get(0).child(0));
         rowNumber += rows.size();
 
         for (Element row : rows) {
-
+            cm.addNewRow();
+            cm.addValues(new String[]{row.child(0).text(), date.toString()});
+            addWeatherInfoToFile(row.child(1).text(), row.child(2).text(), row.child(4).text());
             if (!Arrays.stream(region.getStations()).anyMatch(x -> x.equals(row.child(0).text()))) {
                 getMaxTemp(row.child(1));
                 getMinTemp(row.child(2));
@@ -102,6 +121,39 @@ public class Weather {
                 missingValueIndexes[2]++;
             }
         }
+    }
+
+    private void addWeatherInfoToFile(String maxTemp, String minTemp, String prec) {
+        matcher = tempPattern.matcher(maxTemp);
+        if ("-".equals(maxTemp)) {
+            cm.addValue("");
+        } else if(matcher.find()) {
+            cm.addValue(matcher.group(0));
+        }
+        else{
+        cm.addValue("wrong value - "+maxTemp);
+        }
+        
+        matcher = tempPattern.matcher(minTemp);
+        if ("-".equals(minTemp)) {
+            cm.addValue("");
+        } else if(matcher.find()) {
+            cm.addValue(matcher.group(0));
+        }
+        else{
+        cm.addValue("wrong value - "+minTemp);
+        }
+
+        matcher = tempPattern.matcher(prec);
+        if ("-".equals(prec)) {
+            cm.addValue("");
+         } else if(matcher.find()) {
+            cm.addValue(matcher.group(0));
+        }
+        else{
+        cm.addValue("wrong value - "+prec);
+        }
+
     }
 
     private void getMaxTemp(Element tempElement) throws Exception {
