@@ -1,6 +1,9 @@
 package org.example;
 
+import java.io.BufferedWriter;
 import java.io.File;
+
+import com.opencsv.exceptions.CsvException;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
@@ -51,30 +54,24 @@ public class Weather {
     public void getWeather(LocalDate startDate, LocalDate endDate, Region region) throws Exception {
         cm.loadCsvData();
         for (LocalDate start = startDate; start.isBefore(endDate); start = start.plusDays(1)) {
-            Thread.sleep(2000);
-            System.out.println("dalsi");
+            Thread.sleep(1000);
             String link = prepareLink(start, region.getWeatherRegionNumber());
 
-           // Document doc = Jsoup.connect(link).get();
-            //Document doc = Jsoup.connect("http://C:/Users/dorgu/Documents/Test").get();
-            Document doc=Jsoup.parse(new File("C:/Users/dorgu/Documents/Test.html"), null);
-            //System.out.println(doc.getElementsByTag("tbody"));
-            int a=0;
+            Document doc = Jsoup.connect(link).get();
+
+            
             for (Element tBody : doc.getElementsByTag("tbody")) {
-                try{
+                try {
                     loadData(tBody.children(), start, region);
-                    a++;
-                    System.out.println(tBody.child(0).child(0).child(0).child(0));
-                    System.out.println("index: "+a);
-                    System.out.println("pocet: " +tBody.child(0).child(0).child(0).childNodeSize()+"\n");
+                
 
                 } catch (IndexOutOfBoundsException e) {
-                   System.out.println(e);
+                    System.out.println(e);
                 }
 
             }
-            
-           /* double maxTempMean = round(mean(maxTemp, rowNumber - missingValueIndexes[0]), 1);
+
+            double maxTempMean = round(mean(maxTemp, rowNumber - missingValueIndexes[0]), 1);
             double minTempMean = round(mean(minTemp, rowNumber - missingValueIndexes[1]), 1);
             double precMean = round(mean(precipitation, rowNumber - missingValueIndexes[2]), 1);
 
@@ -87,9 +84,9 @@ public class Weather {
             precList = new LinkedList<>();
             missingValueIndexes = new int[3];
             rowNumber = 0;
-*/
+
         }
-       // cm.writeData();
+        cm.writeData();
 
     }
 
@@ -104,7 +101,7 @@ public class Weather {
     }
 
     private void loadData(Elements rows, LocalDate date, Region region) throws Exception {
-        //System.out.println(rows.get(0).child(0));
+       
         rowNumber += rows.size();
 
         for (Element row : rows) {
@@ -127,31 +124,28 @@ public class Weather {
         matcher = tempPattern.matcher(maxTemp);
         if ("-".equals(maxTemp)) {
             cm.addValue("");
-        } else if(matcher.find()) {
+        } else if (matcher.find()) {
             cm.addValue(matcher.group(0));
+        } else {
+            cm.addValue("wrong value - " + maxTemp);
         }
-        else{
-        cm.addValue("wrong value - "+maxTemp);
-        }
-        
+
         matcher = tempPattern.matcher(minTemp);
         if ("-".equals(minTemp)) {
             cm.addValue("");
-        } else if(matcher.find()) {
+        } else if (matcher.find()) {
             cm.addValue(matcher.group(0));
-        }
-        else{
-        cm.addValue("wrong value - "+minTemp);
+        } else {
+            cm.addValue("wrong value - " + minTemp);
         }
 
         matcher = tempPattern.matcher(prec);
         if ("-".equals(prec)) {
             cm.addValue("");
-         } else if(matcher.find()) {
+        } else if (matcher.find()) {
             cm.addValue(matcher.group(0));
-        }
-        else{
-        cm.addValue("wrong value - "+prec);
+        } else {
+            cm.addValue("wrong value - " + prec);
         }
 
     }
@@ -163,7 +157,6 @@ public class Weather {
         } else if (matcher.find()) {
             maxTemp += Double.parseDouble(matcher.group(0));
         } else {
-            System.out.println(tempElement.text().length());
             throw new Exception("Wrong Input");
         }
 
@@ -263,5 +256,124 @@ public class Weather {
 
         myWriter.close();
     }
+
+    public void readHTML(String fileName, String elementName) throws IOException {
+        Document doc = Jsoup.parse(new File("C:/Users/dorgu/Documents/Pocasi/asd.html"), null);
+        BufferedWriter writer = new BufferedWriter(new FileWriter(fileName, true));
+        for (Element e : doc.getElementsByClass(elementName)) {
+            Elements rows = e.getElementsByTag("th");
+            for (Element element : rows) {
+                writer.write(element.text() + ";");
+
+            }
+            writer.newLine();
+
+
+        }
+        writer.close();
+    }
+
+    public void executeDensityTable(int limit,int interval) throws IOException, CsvException, InterruptedException {
+        List<String>data;
+        Document doc;
+        FileWriter fw;
+        int newLimit=0;
+        CsvManager cm=new CsvManager(new File("hustotaSpecifikace/asd.csv"),';');
+        String baseLink = "https://scitani.rsd.cz/CSD_2020/pages/intenzitytable/default.aspx?s=";
+        cm.loadCsvData();
+        //po pa IntenzityTable_IntenzityTableDetail_lbl2IPD_LN
+        // so ne IntenzityTable_IntenzityTableDetail_lbl2IVD_LN
+
+        //6-18 IntenzityTable_IntenzityTableDetail_lbl2IS den
+        // IntenzityTable_IntenzityTableDetail_lbl2IS vecer
+        // IntenzityTable_IntenzityTableDetail_lbl2IS noc
+
+        for(int row=1; row<cm.csvData.size() && limit!=0;row++)
+        {
+
+            String []ar=cm.csvData.get(row);
+
+            if(ar.length<4)
+            {
+                data=new LinkedList<>();
+                limit--;
+               doc=Jsoup.connect(baseLink+ar[0]).get();
+
+                fw=new FileWriter("hustotaSpecifikace/url/"+ar[0]+".html");
+                fw.write(doc.toString());
+                fw.close();
+
+                data.addAll(getDensityRow(doc,"IntenzityTable_IntenzityTableDetail_lbl2IPD","SV"));
+                data.addAll(getDensityRow(doc,"IntenzityTable_IntenzityTableDetail_lbl2IVD","SV"));
+
+                data.addAll(getDensityRow(doc,"IntenzityTable_IntenzityTableDetail_lbl2IS","den"));
+                data.addAll(getDensityRow(doc,"IntenzityTable_IntenzityTableDetail_lbl2IS","vecer"));
+                data.addAll(getDensityRow(doc,"IntenzityTable_IntenzityTableDetail_lbl2IS","noc"));
+
+                cm.addValues(row,data.toArray(new String[0]));
+               
+                Thread.sleep(interval);
+            }
+
+        }
+        cm.writeData();
+        //Document doc = Jsoup.parse(new File(url), null);
+
+
+
+
+
+
+    }
+
+    public void executeDensityTable() throws IOException, CsvException, InterruptedException {
+        List<String>data;
+        Document doc;
+
+        CsvManager cm=new CsvManager(new File("hustotaSpecifikace/hust.csv"),';');
+        cm.loadCsvData();
+
+        for(int row=1; row<cm.csvData.size() ;row++)
+        {
+
+            String []ar=cm.csvData.get(row);
+
+
+                data=new LinkedList<>();
+
+            File in = new File("hustotaSpecifikace/url/"+ar[0]+".html");
+
+            doc=Jsoup.parse(in,null);
+
+            data.addAll(getDensityRow(doc,"IntenzityTable_IntenzityTableDetail","lbl2SumAll"));
+
+                data.addAll(getDensityRow(doc,"IntenzityTable_IntenzityTableDetail_lbl2IPD","SV"));
+
+                data.addAll(getDensityRow(doc,"IntenzityTable_IntenzityTableDetail_lbl2IVD","SV"));
+
+                data.addAll(getDensityRow(doc,"IntenzityTable_IntenzityTableDetail_lbl2IS","den"));
+                data.addAll(getDensityRow(doc,"IntenzityTable_IntenzityTableDetail_lbl2IS","vecer"));
+                data.addAll(getDensityRow(doc,"IntenzityTable_IntenzityTableDetail_lbl2IS","noc"));
+
+                cm.addValues(row,data.toArray(new String[0]));
+
+        }
+        cm.writeData();
+
+    }
+
+    private List<String> getDensityRow(Document d,String baseId,String...a) throws IOException {
+
+        List<String>data=new LinkedList<>();
+        for(int i=0;i<a.length;i++)
+        {
+
+            Element element=d.getElementById(baseId+"_"+a[i]);
+
+            data.add(d.getElementById(baseId+"_"+a[i]).text());
+        }
+        return data;
+    }
+
 
 }
